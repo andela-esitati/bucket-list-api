@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from flask import current_app
 
-__all__ = ['User', 'BucketLists', 'BucketListItems']
+__all__ = ['User', 'BucketList', 'BucketListItems']
 
 
 class User(db.Model):
@@ -43,7 +43,7 @@ class User(db.Model):
     class BucketList(db.Model):
         __tablename__ = 'bucketlist'
         bucketlist_id = db.Column(db.Integer, primary_key=True)
-        name = db.Column(db.String(100), nullable=False)
+        name = db.Column(db.String(150), nullable=False)
         date_created = db.Column(db.Datetime, default=datetime.now())
         date_modified = db.Column(db.Datetime, default=datetime.now())
         created_by = db.Column(db.Integer, db.ForeignKey('user.user_id',
@@ -52,8 +52,16 @@ class User(db.Model):
                                           backref='bucketlist',
                                           passive_deletes=True)
 
-    
-
+    class BucketListItems(db.Model):
+        __tablename__ = 'bucketlistitems'
+        item_id = db.Column(db.Integer, primary_key=True)
+        bucketlist_id = db.Column(db.Integer,
+                                  db.ForeignKey('bucketlist.bucketlist_id',
+                                                ondelete='CASCADE'))
+        name = db.Column(db.String(150), nullable=False)
+        date_created = db.Column(db.Datetime, default=datetime.now())
+        date_modified = db.Column(db.Datetime, default=datetime.now())
+        done = db.Column(db.Boolean, default='False')
 
 
 db.create_all()

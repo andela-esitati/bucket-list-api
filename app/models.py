@@ -1,11 +1,15 @@
 
 from app import db
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from flask import current_app
 
+__all__ = ['User', 'BucketLists', 'BucketListItems']
+
 
 class User(db.Model):
+    __tablename__ = 'users'
     user_id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(70), index=True)
     password_hash = db.Column(db.String(135))
@@ -35,6 +39,21 @@ class User(db.Model):
             return None
         # the id identifies the user if the token is valid
         return User.query.get(data['user_id'])
+
+    class BucketList(db.Model):
+        __tablename__ = 'bucketlist'
+        bucketlist_id = db.Column(db.Integer, primary_key=True)
+        name = db.Column(db.String(100), nullable=False)
+        date_created = db.Column(db.Datetime, default=datetime.now())
+        date_modified = db.Column(db.Datetime, default=datetime.now())
+        created_by = db.Column(db.Integer, db.ForeignKey('user.user_id',
+                                                         ondelete='CASCADE'))
+        bucketlistitems = db.relationship('BucketListItems',
+                                          backref='bucketlist',
+                                          passive_deletes=True)
+
+    
+
 
 
 db.create_all()

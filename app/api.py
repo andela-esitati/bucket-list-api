@@ -3,6 +3,7 @@ from datetime import datetime
 from dateutil import parser as datetime_parser
 from dateutil.tz import tzutc
 from flask import Flask, url_for, jsonify, request, g, Blueprint, current_app
+from flask_api import status
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
 from models import *
@@ -76,6 +77,35 @@ def before_request():
 @auth.login_required
 def get_auth_token():
     return jsonify({'token': g.user.generate_auth_token()})
+
+
+@api.route('/auth/register', methods=['POST'])
+def register_new_user():
+    username = request.json.get('username', '')
+    password = request.json.get('password', '')
+
+    # check if username or password are provided
+    if not username.strip() or not password.strip():
+        return jsonify({'message': 'Username/Passwords Not Provided!'})
+
+    # Check if the username already exists
+    if db.session.query(User).filter_by(username=username).first() is not None:
+        user = db.session.query(User).filter_by(username=username).first()
+        return jsonify({'message': 'User already exists!'})
+
+    user = User(username=username)
+    user.hash_password(password)
+    db.session.add(user)
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'message': 'error occured while adding user'})
+    return jsonify({
+        'user': user.username,
+        'message': 'login endpoint: localhost:5000/auth/login'
+    }), status.HTTP_201_CREATED
 
 
 # registering blue print

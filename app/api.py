@@ -1,85 +1,69 @@
 import os
-from datetime import datetime
-from dateutil import parser as datetime_parser
-from dateutil.tz import tzutc
-from flask import Flask, url_for, jsonify, request, g, Blueprint, current_app
+from flask import Flask, jsonify, request
 from flask_api import status
 from flask_sqlalchemy import SQLAlchemy
-from flask_httpauth import HTTPBasicAuth
+from flask_httpauth import HTTPTokenAuth
 from models import *
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, '../data.sqlite')
 
 app = Flask(__name__)
+db = SQLAlchemy(app)
+auth = HTTPTokenAuth(scheme='Token')
+# auth = HTTPBasicAuth()
 # creating a blueprint for all routes authenticated by python
-api = Blueprint('api', __name__)
+# api = Blueprint('api', __name__)
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
-# initialize the database
-db = SQLAlchemy(app)
-auth = HTTPBasicAuth()
-auth_token = HTTPBasicAuth()
-
-# working with auth to determine wether a password is correct or incorrect
-# it will return true or false depending wether the password is correct or
-# incorrect
+current_user = {
+    'user_id': None
+}
 
 
-@auth.verify_password
+@auth.verify_token
+def verify_auth_token(token):
+    s = Serializer(app.config['SECRET_KEY'])
+    try:
+        data = s.loads(token)
+    except SignatureExpired:
+        # The token is valid but has expired
+        return None
+    except BadSignature:
+        # The token is invalid
+        return None
+    user_id = data['id']
+    current_user['user_id'] = user_id
+    return user_id
+
+
+@app.errorhandler(404)
+def invalid_url(error):
+    return jsonify({'message': 'You entered an invalid URL'})
+
+
+@app.errorhandler(401)
+def token_expired_or_invalid(error):
+    return jsonify({'message': 'Token Expired/Invalid'})
+
+
 def verify_password(username, password):
-    # getting a user from the database
-    g.user = User.query.filter_by(username=username).first()
-    if g.user is None:
+    user = db.session.query(User).filter_by(username=username).first()
+    if not user or not user.verify_password(password):
         return False
-    return g.user.verify_password(password)
-
-
-# handling an error that occurs because of an incorrect password
-
-
-@auth.error_handler
-def unauthorized():
-    response = jsonify({'status': 401, 'error': 'unauthorized',
-                        'message': 'please authenticate'})
-    response.status_code = 401
-    return
-
-
-@auth_token.verify_password
-# token will come in place of username
-# unused beacuse we are not using password
-def verify_auth_token(token, unused):
-    g.user = User.verify_auth_token(token)
-    return g.user is not None
-
-# error handler for aunauthorised token
-
-
-@auth_token.error_handler
-def unauthorized_token():
-    response = jsonify({'status': 401, 'error': 'unauthorizes',
-                        'message': 'please send your authentication token'})
-    response.status_code = 401
-    return response
-
-
-@api.before_request
-@auth_token.login_required
-def before_request():
-    pass
-
+    return user
 # function that requests tokens
 
 
-@app.route('/get-auth-token')
-@auth.login_required
-def get_auth_token():
-    return jsonify({'token': g.user.generate_auth_token()})
+# @app.route('/get-auth-token')
+# @auth.login_required
+# def get_auth_token():
+#     return jsonify({'token': g.user.generate_auth_token()})
 
 
-@api.route('/auth/register', methods=['POST'])
+@app.route('/auth/register', methods=['POST'])
 def register_new_user():
     username = request.json.get('username', '')
     password = request.json.get('password', '')
@@ -108,8 +92,28 @@ def register_new_user():
     }), status.HTTP_201_CREATED
 
 
-# registering blue print
-app.register_blueprint(api)
+@app.route('/auth/login', methods=['POST'])
+def login_user():
+    username = request.json.get('username', '')
+    password = request.json.get('password', '')
+
+    # check if username or password are provided
+    if not username.strip() or not password.strip():
+        return jsonify({'message': 'Username/Password Not Provided!'})
+
+    user = verify_password(username, password)
+    if user:
+        token = user.generate_auth_token()
+        return jsonify({
+            'message': 'Hello, {0}'.format(user.username),
+            'token': 'Token ' + token.decode('ascii')
+        })
+    else:
+        return jsonify({'message': 'invalid username/passwprd'})
+
+        # # registering blue print
+        # app.register_blueprint(api)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

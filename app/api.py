@@ -111,9 +111,29 @@ def login_user():
     else:
         return jsonify({'message': 'invalid username/passwprd'})
 
-        # # registering blue print
-        # app.register_blueprint(api)
 
+@app.route('/bucketlists', methods=['POST'])
+@auth.login_required
+def create_bucketlist():
+    user_id = current_user['user_id']
+    name = request.json.get('name', '')
+
+    if not name.strip():
+        return jsonify({'message': 'bucketlist name not provided'})
+
+    if db.session.query(BucketList).filter_by(name=name,
+                                              created_by=user_id).first() is not None:
+        return jsonify({'message': 'bucketlist already exists'})
+
+    bucketlist = BucketList(name=name, created_by=user_id)
+    db.session.add(bucketlist)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({
+            'message': 'error occured while creating bucketlist'}), status.HTTP_500_INTERNAL_SERVER_ERROR
+    return jsonify({'message': 'created bucketlist: {0}'.format(name)}), status.HTTP_201_CREATED
 
 if __name__ == '__main__':
     app.run(debug=True)

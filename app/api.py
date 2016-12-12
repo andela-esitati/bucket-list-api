@@ -135,5 +135,72 @@ def create_bucketlist():
             'message': 'error occured while creating bucketlist'}), status.HTTP_500_INTERNAL_SERVER_ERROR
     return jsonify({'message': 'created bucketlist: {0}'.format(name)}), status.HTTP_201_CREATED
 
+
+@app.route('/bucketlists', methods=['GET'])
+@auth.login_required
+def get_bucket_lists():
+    user_id = current_user['user_id']
+    try:
+        page = int(request.args.get('page', 1))
+    except Exception:
+        return jsonify({'message': 'Invalid Page Value'})
+        try:
+            limit = int(request.args.get('limit', 20))
+        except Exception:
+            return jsonify({'message': 'Invalid Limit Value'})
+        search = request.args.get('q', '')
+
+    if db.session.query(BucketList).filter_by(created_by=user_id).count == 0:
+        return jsonify({'message': 'no bucketlist found'})
+
+    bucketlist_rows = BucketList.query.filter(
+        BucketList.created_by == user_id,
+        BucketList.name.like('%' + search + '%')).paginate(page, limit, False)
+
+    all_pages = bucketlist_rows.all_pages
+    next_page = bucketlist_rows.has_next
+    previous_page = bucketlist_rows.has_prev
+
+    if next_page:
+        next_page_url = str(request.url_root) + 'bucketlists?' + \
+            'limit=' + str(limit) + '&page=' + str(page + 1)
+    else:
+        next_page_url = None
+
+    if previous_page:
+        previous_page_url = str(request.url_root) + 'bucketlists?' + \
+            'limit=' + str(limit) + '&page=' + str(page - 1)
+
+    else:
+        previous_page_url = None
+
+    bucketlists = []
+    for bucketlist in bucketlist_rows.items:
+        bucketlistitems = []
+        bucketlistitem_rows = BucketListItems.query.filter(
+            BucketListItems.bucketlist_id == bucketlist.bucketlist_id).all()
+        for bucketlistitem in bucketlistitem_rows:
+            bucketlistitems.append({
+                'id': bucketlistitem.item_id,
+                'name': bucketlistitem.name,
+                'date_created': bucketlistitem.date_created,
+                'date_modified': bucketlistitems.date_modified,
+                'done': bucketlistitem.done
+            })
+
+        bucketlists.append({
+            'id': bucketlist.bucketlist_id,
+            'name': bucketlist.name,
+            'date_created': bucketlist.date_created,
+            'date_modified': bucketlist.date_modified,
+            'created_by': bucketlist.created_by,
+            'items': bucketlistitems,
+            'total_pages': all_pages,
+            'next_page': next_page_url,
+            'previous_page': previous_page_url
+        })
+    return jsonify(bucketlists)
+
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -238,5 +238,30 @@ def get_specific_bucket_list(bucketlist_id):
     return jsonify(bucketlists)
 
 
+@app.route('/bucketlists/<int:bucketlist_id>', methods=['PUT'])
+@auth.login_required
+def update_bucket_list(bucketlist_id):
+    user_id = current_user['user_id']
+    name = request.json.get('name', '')
+
+    if not name.strip():
+        return jsonify({'message': 'please provide a name'})
+
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
+        return jsonify({'message': 'bucketlist does not exist'})
+
+    bucketlist = db.session.query(BucketList).filter_by(
+        bucketlist_id=bucketlist_id, created_by=user_id).first()
+    bucketlist.name = name
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'message': 'error updating bucketlist'}), status.HTTP_500_INTERNAL_SERVER_ERROR
+    return jsonify({
+        'message': 'bucketlist {0} updated successfully'.format(bucketlist_id)})
+
+
 if __name__ == '__main__':
     app.run(debug=True)

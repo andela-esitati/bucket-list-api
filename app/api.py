@@ -202,5 +202,41 @@ def get_bucket_lists():
     return jsonify(bucketlists)
 
 
+@app.route('/bucketlists/<int:bucketlist_id>', methods=['GET'])
+@auth.login_required
+def get_specific_bucket_list(bucketlist_id):
+    user_id = current_user['user_id']
+
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id).count() == 0:
+        return jsonify({'message': 'bucket list not found'})
+
+    bucketlist_rows = db.session.query(BucketList).filter_by(
+        created_by=user_id, bucketlist_id=bucketlist_id).all()
+    bucketlists = []
+    bucketlistitems = []
+    bucketlistitem_rows = db.session.query(BucketListItems).filter_by(
+        bucketlist_id=bucketlist_id).all()
+    for bucketlistitem in bucketlistitem_rows:
+        bucketlistitems.append({
+            'id': bucketlistitem.item_id,
+            'name': bucketlistitem.name,
+            'date_created': bucketlistitem.date_created,
+            'date_modified': bucketlistitem.date_modified,
+            'done': bucketlistitem.done
+        })
+    for bucketlist in bucketlist_rows:
+        bucketlists.append({
+            'id': bucketlist.bucketlist_id,
+            'name': bucketlist.name,
+            'items': bucketlistitems,
+            'date_created': bucketlist.date_created,
+            'date_modified': bucketlist.date_modified,
+            'created_by': bucketlis.created_by
+        })
+
+    return jsonify(bucketlists)
+
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -284,5 +284,35 @@ def delete_bucket_list(bucketlist_id):
     return jsonify({'message':
                     'successfully deleted bucketlist {0}'.format(bucketlist_id)})
 
+
+@app.route('/bucketlists/<int:bucketlist_id>/items', methods=['POST'])
+@auth.login_required
+def add_bucket_list_item(bucketlist_id):
+    user_id = current_user['user_id']
+    name = request.json.get('name', '')
+    done = request.json.get('done', False)
+
+    if not name.strip():
+        return jsonify({'message': 'please provide the name field'})
+
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id) is None:
+        return jsonify({'message': 'bucketlist not found'})
+
+    if db.session.query(BucketListItems).filter_by(bucketlist_id=bucketlist_id,
+                                                   name=name).first() is not None:
+        return jsonify({'message': 'bucketlist item already exists'})
+
+    bucketlistitem = BucketListItems(bucketlist_id=bucketlist_id,
+                                     name=name, done=done)
+
+    db.session.add(bucketlistitem)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify('error adding bucketlist item'), status.HTTP_500_INTERNAL_SERVER_ERROR
+    return jsonify({'message':
+                    'succesfully added item {0}'.format(name)})
 if __name__ == '__main__':
     app.run(debug=True)

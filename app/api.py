@@ -263,5 +263,26 @@ def update_bucket_list(bucketlist_id):
         'message': 'bucketlist {0} updated successfully'.format(bucketlist_id)})
 
 
+@app.route('/bucketlists/<int:bucketlist_id>', methods=['DELETE'])
+@auth.login_required
+def delete_bucket_list(bucketlist_id):
+    user_id = current_user['user_id']
+
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
+        return jsonify({'message': 'bucketlist not found'})
+
+    db.session.query(BucketList).filter_by(
+        bucketlist_id=bucketlist_id, created_by=user_id).delete()
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'message': 'error deleting bucketlist'}), staus.HTTP_500_INTERNAL_SERVER_ERROR
+
+    return jsonify({'message':
+                    'successfully deleted bucketlist {0}'.format(bucketlist_id)})
+
 if __name__ == '__main__':
     app.run(debug=True)

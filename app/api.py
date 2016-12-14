@@ -352,5 +352,28 @@ def update_bucket_list_item(bucketlist_id, item_id):
         return jsonify({'message': 'error updating bucket list item'}), status.HTTP_500_INTERNAL_SERVER_ERROR
     return jsonify({'message': 'successfully updated bucket list item'})
 
+
+@app.route('/bucketlists/<int:bucketlist_id>/items/<int:item_id>', methods=['DELETE'])
+@auth.login_required
+def delete_bucket_list_item(bucketlist_id, item_id):
+    user_id = current_user['user_id']
+
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
+        return jsonify({'message': 'bucketlist not found'})
+
+    if db.session.query(BucketListItems).filter_by(item_id=item_id).count() == 0:
+        return jsonify({'message': 'bucketlist item does not exist'})
+
+    db.session.query(BucketListItems).filter_by(
+        item_id=item_id).delete()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'message': 'error deleting bucketlist item'}), status.HTTP_500_INTERNAL_SERVER_ERROR
+    return jsonify({'message': 'successfully deleted bucketlist item'})
+
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -314,5 +314,43 @@ def add_bucket_list_item(bucketlist_id):
         return jsonify('error adding bucketlist item'), status.HTTP_500_INTERNAL_SERVER_ERROR
     return jsonify({'message':
                     'succesfully added item {0}'.format(name)})
+
+
+@app.route('/bucketlists/<int:bucketlist_id>/items/<int:item_id>', methods=['PUT'])
+@auth.login_required
+def update_bucket_list_item(bucketlist_id, item_id):
+    user_id = current_user['user_id']
+    done = request.json.get('done')
+
+    if done is None:
+        return jsonify({'message': 'please provide the done field'})
+
+    # check if the current user owns this bucket list
+    if db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id) is None:
+        return jsonify({'message': 'bucketlist not found'}), status.HTTP_304_NOT_MODIFIED
+
+    # check if the bucket list item exists
+    if db.session.query(BucketListItems).filter_by(item_id=item_id) is None:
+        return jsonify({'message': 'bucket list item not found'}), status.HTTP_304_NOT_MODIFIED
+
+    bucketlistitem = db.session.query(BucketListItems).filter_by(
+        item_id=item_id).first()
+    if bucketlistitem is None:
+        return jsonify({'message': 'bucket list item not found'})
+    name = request.json.get('name', bucketlistitem.name)
+    if not name.strip():
+        return jsonify({'message': 'please enter a valid name'})
+    bucketlistitem.name = name
+    bucketlistitem.done = done
+
+    try:
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+        return jsonify({'message': 'error updating bucket list item'}), status.HTTP_500_INTERNAL_SERVER_ERROR
+    return jsonify({'message': 'successfully updated bucket list item'})
+
 if __name__ == '__main__':
     app.run(debug=True)

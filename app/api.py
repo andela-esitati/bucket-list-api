@@ -1,9 +1,10 @@
 import os
+from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired)
 from flask import Flask, jsonify, request
 from flask_api import status
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPTokenAuth
-from models import *
+
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, '../data.sqlite')
@@ -11,6 +12,7 @@ db_path = os.path.join(basedir, '../data.sqlite')
 app = Flask(__name__)
 db = SQLAlchemy(app)
 auth = HTTPTokenAuth(scheme='Token')
+from models import *
 # auth = HTTPBasicAuth()
 # creating a blueprint for all routes authenticated by python
 # api = Blueprint('api', __name__)
@@ -34,7 +36,7 @@ def verify_auth_token(token):
     except BadSignature:
         # The token is invalid
         return None
-    user_id = data['id']
+    user_id = data['user_id']
     current_user['user_id'] = user_id
     return user_id
 
@@ -70,7 +72,7 @@ def register_new_user():
 
     # check if username or password are provided
     if not username.strip() or not password.strip():
-        return jsonify({'message': 'Username/Passwords Not Provided!'})
+        return jsonify({'message': 'Username/Password Not Provided!'})
 
     # Check if the username already exists
     if db.session.query(User).filter_by(username=username).first() is not None:
@@ -78,7 +80,7 @@ def register_new_user():
         return jsonify({'message': 'User already exists!'})
 
     user = User(username=username)
-    user.hash_password(password)
+    user.set_password(password)
     db.session.add(user)
 
     try:
@@ -109,7 +111,7 @@ def login_user():
             'token': 'Token ' + token.decode('ascii')
         })
     else:
-        return jsonify({'message': 'invalid username/passwprd'})
+        return jsonify({'message': 'invalid username/password'})
 
 
 @app.route('/bucketlists', methods=['POST'])
@@ -140,24 +142,24 @@ def create_bucketlist():
 @auth.login_required
 def get_bucket_lists():
     user_id = current_user['user_id']
+    limit = 20
     try:
         page = int(request.args.get('page', 1))
     except Exception:
         return jsonify({'message': 'Invalid Page Value'})
-        try:
-            limit = int(request.args.get('limit', 20))
-        except Exception:
-            return jsonify({'message': 'Invalid Limit Value'})
-        search = request.args.get('q', '')
-
-    if db.session.query(BucketList).filter_by(created_by=user_id).count == 0:
+    try:
+        limit = int(request.args.get('limit', 20))
+    except Exception:
+        return jsonify({'message': 'Invalid Limit Value'})
+    search = request.args.get('q', '')
+    if db.session.query(BucketList).filter_by(created_by=user_id).count() == 0:
         return jsonify({'message': 'no bucketlist found'})
 
     bucketlist_rows = BucketList.query.filter(
         BucketList.created_by == user_id,
         BucketList.name.like('%' + search + '%')).paginate(page, limit, False)
 
-    all_pages = bucketlist_rows.all_pages
+    all_pages = bucketlist_rows.pages
     next_page = bucketlist_rows.has_next
     previous_page = bucketlist_rows.has_prev
 
@@ -184,7 +186,7 @@ def get_bucket_lists():
                 'id': bucketlistitem.item_id,
                 'name': bucketlistitem.name,
                 'date_created': bucketlistitem.date_created,
-                'date_modified': bucketlistitems.date_modified,
+                'date_modified': bucketlistitem.date_modified,
                 'done': bucketlistitem.done
             })
 
@@ -232,7 +234,7 @@ def get_specific_bucket_list(bucketlist_id):
             'items': bucketlistitems,
             'date_created': bucketlist.date_created,
             'date_modified': bucketlist.date_modified,
-            'created_by': bucketlis.created_by
+            'created_by': bucketlist.created_by
         })
 
     return jsonify(bucketlists)
@@ -313,7 +315,7 @@ def add_bucket_list_item(bucketlist_id):
         db.session.rollback()
         return jsonify('error adding bucketlist item'), status.HTTP_500_INTERNAL_SERVER_ERROR
     return jsonify({'message':
-                    'succesfully added item {0}'.format(name)})
+                    'successfully added item {0}'.format(name)})
 
 
 @app.route('/bucketlists/<int:bucketlist_id>/items/<int:item_id>', methods=['PUT'])

@@ -32,7 +32,7 @@
  	* Press *Enter* to complete the cloning process
 3. Virtual Environment Installation
  	* Install the virtual environment by typing: `pip install virtualenv` on your terminal
-4. Create a virtual environment by running `virtualenv --python python bl-venv`. This will create the virtual environment in which you can run the project.
+4. Create a virtual environment by running `virtualenv --python python venv`. This will create the virtual environment in which you can run the project.
 5. Activate the virtual environment by running `source bl-venv/bin/activate`
 6. Enter the project directory by running `cd bucketlist`
 7. Once inside the directory install the required modules

@@ -1,6 +1,6 @@
 import json
 import unittest
-from app.app import app, db
+from app.api import app, db
 
 
 class TestSetup(unittest.TestCase):

@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/andela-esitati/bucket-list-api.svg?branch=develop)](https://travis-ci.org/andela-esitati/bucket-list-api)
-[[![Coverage Status](https://coveralls.io/repos/github/andela-esitati/bucket-list-api/badge.svg?branch=develop)](https://coveralls.io/github/andela-esitati/bucket-list-api?branch=develop)
+[![Coverage Status](https://coveralls.io/repos/github/andela-esitati/bucket-list-api/badge.svg?branch=develop)](https://coveralls.io/github/andela-esitati/bucket-list-api?branch=develop)
 # BucketList API
 
 ## Introduction

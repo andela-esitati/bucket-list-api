@@ -1,6 +1,7 @@
 import json
 import unittest
-from app.api import app, db
+from app.api import app
+from app.models import db
 
 
 class TestSetup(unittest.TestCase):
@@ -27,3 +28,6 @@ class TestSetup(unittest.TestCase):
     def tearDown(self):
         db.session.remove()
         db.drop_all()
+
+if __name__ == '__main__':
+    unittest.main()

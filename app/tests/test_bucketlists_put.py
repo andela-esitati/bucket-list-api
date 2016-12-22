@@ -31,15 +31,15 @@ class TestBucketListPut(TestSetup):
                                  content_type='application/json',
                                  headers=self.headers,
                                  data=json.dumps(bucketlist_data))
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'created bucketlist: {0}'.format(bucketlist_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
+
         bucketlist_data = {'name': 'Test Bucket List  Update'}
         response = self.app.put('/bucketlists/1',
                                 content_type='application/json',
                                 headers=self.headers,
                                 data=json.dumps(bucketlist_data))
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'bucketlist {0} updated successfully'.format(1))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
+
 
 if __name__ == '__main__':
     unittest.main()

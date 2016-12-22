@@ -15,8 +15,7 @@ class TestBucketListItemPost(TestSetup):
                                  data=json.dumps(bucketlist_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'created bucketlist: {0}'.format(bucketlist_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
 
         item_data = {
             'name': ''
@@ -36,8 +35,7 @@ class TestBucketListItemPost(TestSetup):
                                  data=json.dumps(bucketlist_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'created bucketlist: {0}'.format(bucketlist_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
         item_data = {
             'name': 'Test Bucket List Item'
         }
@@ -45,8 +43,7 @@ class TestBucketListItemPost(TestSetup):
                                  data=json.dumps(item_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'successfully added item {0}'.format(item_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
         response = self.app.post('/bucketlists/1/items',
                                  data=json.dumps(item_data),
                                  content_type='application/json',
@@ -62,8 +59,7 @@ class TestBucketListItemPost(TestSetup):
                                  data=json.dumps(bucketlist_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'created bucketlist: {0}'.format(bucketlist_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
 
         item_data = {
             'name': 'Test Bucket List Item'
@@ -72,8 +68,7 @@ class TestBucketListItemPost(TestSetup):
                                  data=json.dumps(item_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'successfully added item {0}'.format(item_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
 
 
 if __name__ == '__main__':

@@ -49,5 +49,6 @@ class TestAuthRegister(TestSetup):
                          'login endpoint: localhost:5000/auth/login')
         self.assertEqual(response.status_code, 201)
 
+
 if __name__ == '__main__':
     unittest.main()

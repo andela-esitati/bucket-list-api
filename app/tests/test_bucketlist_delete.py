@@ -21,15 +21,13 @@ class TestBucketListDelete(TestSetup):
                                  data=json.dumps(bucketlist_data),
                                  content_type='application/json',
                                  headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'created bucketlist: {0}'.format(bucketlist_data['name']))
+        self.assertIsNotNone(str(json.loads(response.get_data())))
         # Delete the created Bucket List
         response = self.app.delete('/bucketlists/1',
                                    data=json.dumps(bucketlist_data),
-                                   content_type='applicaiton/json',
+                                   content_type='application/json',
                                    headers=self.headers)
-        self.assertEqual(str(json.loads(response.get_data())['message']),
-                         'successfully deleted bucketlist {0}'.format(1))
+        self.assertEqual(response.status_code, 204)
 
 
 if __name__ == '__main__':

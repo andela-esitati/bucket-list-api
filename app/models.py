@@ -1,5 +1,5 @@
 
-from app import db
+from api import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
@@ -40,28 +40,52 @@ class User(db.Model):
         # the id identifies the user if the token is valid
         return User.query.get(data['user_id'])
 
-    class BucketList(db.Model):
-        __tablename__ = 'bucketlist'
-        bucketlist_id = db.Column(db.Integer, primary_key=True)
-        name = db.Column(db.String(150), nullable=False)
-        date_created = db.Column(db.Datetime, default=datetime.now())
-        date_modified = db.Column(db.Datetime, default=datetime.now())
-        created_by = db.Column(db.Integer, db.ForeignKey('user.user_id',
-                                                         ondelete='CASCADE'))
-        bucketlistitems = db.relationship('BucketListItems',
-                                          backref='bucketlist',
-                                          passive_deletes=True)
 
-    class BucketListItems(db.Model):
-        __tablename__ = 'bucketlistitems'
-        item_id = db.Column(db.Integer, primary_key=True)
-        bucketlist_id = db.Column(db.Integer,
-                                  db.ForeignKey('bucketlist.bucketlist_id',
-                                                ondelete='CASCADE'))
-        name = db.Column(db.String(150), nullable=False)
-        date_created = db.Column(db.Datetime, default=datetime.now())
-        date_modified = db.Column(db.Datetime, default=datetime.now())
-        done = db.Column(db.Boolean, default='False')
+class BucketList(db.Model):
+    __tablename__ = 'bucketlist'
+    bucketlist_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    date_created = db.Column(db.DateTime, default=datetime.now())
+    date_modified = db.Column(db.DateTime, default=datetime.now())
+    created_by = db.Column(db.Integer, db.ForeignKey('users.user_id',
+                                                     ondelete='CASCADE'))
+    bucketlistitems = db.relationship('BucketListItems',
+                                      backref='bucketlist',
+                                      passive_deletes=True)
+
+    def get(self):
+        user = User.query.filter_by(user_id=self.created_by).first()
+        bucketlistitems = BucketListItems.query.filter_by(
+            bucketlist_id=self.bucketlist_id).all()
+        return {
+            'id': self.bucketlist_id,
+            'name': self.name,
+            'date_created': self.date_created,
+            'date_modified': self.date_modified,
+            'items': bucketlistitems,
+            'created_by': user.username
+        }
+
+
+class BucketListItems(db.Model):
+    __tablename__ = 'bucketlistitems'
+    item_id = db.Column(db.Integer, primary_key=True)
+    bucketlist_id = db.Column(db.Integer,
+                              db.ForeignKey('bucketlist.bucketlist_id',
+                                            ondelete='CASCADE'))
+    name = db.Column(db.String(150), nullable=False)
+    date_created = db.Column(db.DateTime, default=datetime.now())
+    date_modified = db.Column(db.DateTime, default=datetime.now())
+    done = db.Column(db.Boolean, default='False')
+
+    def get(self):
+        return {
+            'id': self.item_id,
+            'name': self.name,
+            'date_created': self.date_created,
+            'date_modified': self.date_modified,
+            'done': self.done
+        }
 
 
 db.create_all()

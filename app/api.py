@@ -1,5 +1,7 @@
 import os
-from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired)
+from itsdangerous import (
+    TimedJSONWebSignatureSerializer as Serializer,
+    BadSignature, SignatureExpired)
 from flask import Flask, jsonify, request
 from flask_api import status
 from flask_sqlalchemy import SQLAlchemy
@@ -12,7 +14,8 @@ db_path = os.path.join(basedir, '../data.sqlite')
 app = Flask(__name__)
 db = SQLAlchemy(app)
 auth = HTTPTokenAuth(scheme='Token')
-from models import *
+
+from models import User, BucketList, BucketListItems
 # auth = HTTPBasicAuth()
 # creating a blueprint for all routes authenticated by python
 # api = Blueprint('api', __name__)
@@ -43,26 +46,19 @@ def verify_auth_token(token):
 
 @app.errorhandler(404)
 def invalid_url(error):
-    return jsonify({'message': 'You entered an invalid URL'})
+    return jsonify({'message': 'You entered an invalid URL'}), 404
 
 
 @app.errorhandler(401)
 def token_expired_or_invalid(error):
-    return jsonify({'message': 'Token Expired/Invalid'})
+    return jsonify({'message': 'Token Expired/Invalid'}), 401
 
 
 def verify_password(username, password):
-    user = db.session.query(User).filter_by(username=username).first()
+    user = User.query.filter_by(username=username).first()
     if not user or not user.verify_password(password):
         return False
     return user
-# function that requests tokens
-
-
-# @app.route('/get-auth-token')
-# @auth.login_required
-# def get_auth_token():
-#     return jsonify({'token': g.user.generate_auth_token()})
 
 
 @app.route('/auth/register', methods=['POST'])
@@ -72,12 +68,12 @@ def register_new_user():
 
     # check if username or password are provided
     if not username.strip() or not password.strip():
-        return jsonify({'message': 'Username/Password Not Provided!'})
+        return jsonify({'message': 'Username/Password Not Provided!'}), 400
 
     # Check if the username already exists
-    if db.session.query(User).filter_by(username=username).first() is not None:
-        user = db.session.query(User).filter_by(username=username).first()
-        return jsonify({'message': 'User already exists!'})
+    user = db.session.query(User).filter_by(username=username).first()
+    if user is not None:
+        return jsonify({'message': 'User already exists!'}), 400
 
     user = User(username=username)
     user.set_password(password)
@@ -87,11 +83,11 @@ def register_new_user():
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({'message': 'error occured while adding user'})
+        return jsonify({'message': 'error occured while adding user'}), 400
     return jsonify({
         'user': user.username,
         'message': 'login endpoint: localhost:5000/auth/login'
-    }), status.HTTP_201_CREATED
+    }), 201
 
 
 @app.route('/auth/login', methods=['POST'])
@@ -101,7 +97,7 @@ def login_user():
 
     # check if username or password are provided
     if not username.strip() or not password.strip():
-        return jsonify({'message': 'Username/Password Not Provided!'})
+        return jsonify({'message': 'Username/Password Not Provided!'}), 400
 
     user = verify_password(username, password)
     if user:
@@ -109,9 +105,9 @@ def login_user():
         return jsonify({
             'message': 'Hello, {0}'.format(user.username),
             'token': 'Token ' + token.decode('ascii')
-        })
+        }), 201
     else:
-        return jsonify({'message': 'invalid username/password'})
+        return jsonify({'message': 'invalid username/password'}), 400
 
 
 @app.route('/bucketlists', methods=['POST'])
@@ -123,19 +119,22 @@ def create_bucketlist():
     if not name.strip():
         return jsonify({'message': 'bucketlist name not provided'})
 
-    if db.session.query(BucketList).filter_by(name=name,
-                                              created_by=user_id).first() is not None:
-        return jsonify({'message': 'bucketlist already exists'})
+    bucket_found = BucketList.query.filter_by(name=name,
+                                              created_by=user_id).first()
+    if bucket_found:
+        return jsonify({'message': 'bucketlist already exists'}), 400
 
     bucketlist = BucketList(name=name, created_by=user_id)
     db.session.add(bucketlist)
+
     try:
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({
-            'message': 'error occured while creating bucketlist'}), status.HTTP_500_INTERNAL_SERVER_ERROR
-    return jsonify({'message': 'created bucketlist: {0}'.format(name)}), status.HTTP_201_CREATED
+        return jsonify({'message':
+                        'error occured while creating bucketlist'}), 400
+    return jsonify({'message':
+                    'created bucketlist: {0}'.format(name)}), 201
 
 
 @app.route('/bucketlists', methods=['GET'])
@@ -146,14 +145,14 @@ def get_bucket_lists():
     try:
         page = int(request.args.get('page', 1))
     except Exception:
-        return jsonify({'message': 'Invalid Page Value'})
+        return jsonify({'message': 'Invalid Page Value'}), 400
     try:
         limit = int(request.args.get('limit', 20))
     except Exception:
-        return jsonify({'message': 'Invalid Limit Value'})
+        return jsonify({'message': 'Invalid Limit Value'}), 400
     search = request.args.get('q', '')
     if db.session.query(BucketList).filter_by(created_by=user_id).count() == 0:
-        return jsonify({'message': 'no bucketlist found'})
+        return jsonify({'message': 'no bucketlist found'}), 400
 
     bucketlist_rows = BucketList.query.filter(
         BucketList.created_by == user_id,
@@ -164,44 +163,28 @@ def get_bucket_lists():
     previous_page = bucketlist_rows.has_prev
 
     if next_page:
-        next_page_url = str(request.url_root) + 'bucketlists?' + \
-            'limit=' + str(limit) + '&page=' + str(page + 1)
+        next_page_url = (str(request.url_root) + 'bucketlists?' +
+                         'limit=' + str(limit) + '&page=' + str(page + 1))
     else:
         next_page_url = None
 
     if previous_page:
-        previous_page_url = str(request.url_root) + 'bucketlists?' + \
-            'limit=' + str(limit) + '&page=' + str(page - 1)
+        previous_page_url = (str(request.url_root) + 'bucketlists?' +
+                             'limit=' + str(limit) + '&page=' + str(page - 1))
 
     else:
         previous_page_url = None
 
     bucketlists = []
-    for bucketlist in bucketlist_rows.items:
-        bucketlistitems = []
-        bucketlistitem_rows = BucketListItems.query.filter(
-            BucketListItems.bucketlist_id == bucketlist.bucketlist_id).all()
-        for bucketlistitem in bucketlistitem_rows:
-            bucketlistitems.append({
-                'id': bucketlistitem.item_id,
-                'name': bucketlistitem.name,
-                'date_created': bucketlistitem.date_created,
-                'date_modified': bucketlistitem.date_modified,
-                'done': bucketlistitem.done
-            })
+    for bucket in bucketlist_rows.items:
+        bucketlists.append(bucket.get())
 
-        bucketlists.append({
-            'id': bucketlist.bucketlist_id,
-            'name': bucketlist.name,
-            'date_created': bucketlist.date_created,
-            'date_modified': bucketlist.date_modified,
-            'created_by': bucketlist.created_by,
-            'items': bucketlistitems,
-            'total_pages': all_pages,
-            'next_page': next_page_url,
-            'previous_page': previous_page_url
-        })
-    return jsonify(bucketlists)
+        paginated_bucketlist = {'total_pages': all_pages,
+                                'next_page': next_page_url,
+                                'previous_page': previous_page_url,
+                                'BucketList': bucketlists
+                                }
+    return jsonify(paginated_bucketlist)
 
 
 @app.route('/bucketlists/<int:bucketlist_id>', methods=['GET'])
@@ -209,35 +192,12 @@ def get_bucket_lists():
 def get_specific_bucket_list(bucketlist_id):
     user_id = current_user['user_id']
 
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id).count() == 0:
-        return jsonify({'message': 'bucket list not found'})
-
-    bucketlist_rows = db.session.query(BucketList).filter_by(
-        created_by=user_id, bucketlist_id=bucketlist_id).all()
-    bucketlists = []
-    bucketlistitems = []
-    bucketlistitem_rows = db.session.query(BucketListItems).filter_by(
-        bucketlist_id=bucketlist_id).all()
-    for bucketlistitem in bucketlistitem_rows:
-        bucketlistitems.append({
-            'id': bucketlistitem.item_id,
-            'name': bucketlistitem.name,
-            'date_created': bucketlistitem.date_created,
-            'date_modified': bucketlistitem.date_modified,
-            'done': bucketlistitem.done
-        })
-    for bucketlist in bucketlist_rows:
-        bucketlists.append({
-            'id': bucketlist.bucketlist_id,
-            'name': bucketlist.name,
-            'items': bucketlistitems,
-            'date_created': bucketlist.date_created,
-            'date_modified': bucketlist.date_modified,
-            'created_by': bucketlist.created_by
-        })
-
-    return jsonify(bucketlists)
+    bucketlist = db.session.query(BucketList).filter_by(
+        bucketlist_id=bucketlist_id,
+        created_by=user_id).first()
+    if not bucketlist:
+        return jsonify({'message': 'bucket list not found'}), 400
+    return jsonify(bucketlist.get()), 200
 
 
 @app.route('/bucketlists/<int:bucketlist_id>', methods=['PUT'])
@@ -247,22 +207,20 @@ def update_bucket_list(bucketlist_id):
     name = request.json.get('name', '')
 
     if not name.strip():
-        return jsonify({'message': 'please provide a name'})
-
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
-        return jsonify({'message': 'bucketlist does not exist'})
+        return jsonify({'message': 'please provide a name'}), 400
 
     bucketlist = db.session.query(BucketList).filter_by(
         bucketlist_id=bucketlist_id, created_by=user_id).first()
+    if not bucketlist:
+        return jsonify({'message': 'bucketlist does not exist'}), 400
+
     bucketlist.name = name
     try:
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({'message': 'error updating bucketlist'}), status.HTTP_500_INTERNAL_SERVER_ERROR
-    return jsonify({
-        'message': 'bucketlist {0} updated successfully'.format(bucketlist_id)})
+        return jsonify({'message': 'error updating bucketlist'}), 400
+    return jsonify(bucketlist.get()), 200
 
 
 @app.route('/bucketlists/<int:bucketlist_id>', methods=['DELETE'])
@@ -270,21 +228,20 @@ def update_bucket_list(bucketlist_id):
 def delete_bucket_list(bucketlist_id):
     user_id = current_user['user_id']
 
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
+    delete_bucketlist = db.session.query(BucketList).filter_by(
+        bucketlist_id=bucketlist_id, created_by=user_id).first()
+
+    if not delete_bucketlist:
         return jsonify({'message': 'bucketlist not found'})
 
-    db.session.query(BucketList).filter_by(
-        bucketlist_id=bucketlist_id, created_by=user_id).delete()
-
     try:
+        db.session.delete(delete_bucketlist)
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({'message': 'error deleting bucketlist'}), staus.HTTP_500_INTERNAL_SERVER_ERROR
+        return jsonify({'message': 'error deleting bucketlist'}), 400
 
-    return jsonify({'message':
-                    'successfully deleted bucketlist {0}'.format(bucketlist_id)})
+    return jsonify({}), 204
 
 
 @app.route('/bucketlists/<int:bucketlist_id>/items', methods=['POST'])
@@ -297,12 +254,12 @@ def add_bucket_list_item(bucketlist_id):
     if not name.strip():
         return jsonify({'message': 'please provide the name field'})
 
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id) is None:
+    if not db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id):
         return jsonify({'message': 'bucketlist not found'})
 
     if db.session.query(BucketListItems).filter_by(bucketlist_id=bucketlist_id,
-                                                   name=name).first() is not None:
+                                                   name=name).first():
         return jsonify({'message': 'bucketlist item already exists'})
 
     bucketlistitem = BucketListItems(bucketlist_id=bucketlist_id,
@@ -313,36 +270,32 @@ def add_bucket_list_item(bucketlist_id):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify('error adding bucketlist item'), status.HTTP_500_INTERNAL_SERVER_ERROR
-    return jsonify({'message':
-                    'successfully added item {0}'.format(name)})
+        return jsonify('error adding bucketlist item'), 400
+    return jsonify(bucketlistitem.get()), 200
 
 
 @app.route('/bucketlists/<int:bucketlist_id>/items/<int:item_id>', methods=['PUT'])
 @auth.login_required
 def update_bucket_list_item(bucketlist_id, item_id):
     user_id = current_user['user_id']
-    done = request.json.get('done')
-
-    if done is None:
-        return jsonify({'message': 'please provide the done field'})
+    done = request.json.get('done', False)
 
     # check if the current user owns this bucket list
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id) is None:
-        return jsonify({'message': 'bucketlist not found'}), status.HTTP_304_NOT_MODIFIED
+    if not db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id):
+        return jsonify({'message': 'bucketlist not found'}), 400
 
     # check if the bucket list item exists
-    if db.session.query(BucketListItems).filter_by(item_id=item_id) is None:
-        return jsonify({'message': 'bucket list item not found'}), status.HTTP_304_NOT_MODIFIED
+    if not db.session.query(BucketListItems).filter_by(item_id=item_id):
+        return jsonify({'message': 'bucket list item not found'}), 400
 
     bucketlistitem = db.session.query(BucketListItems).filter_by(
         item_id=item_id).first()
-    if bucketlistitem is None:
-        return jsonify({'message': 'bucket list item not found'})
+    if not bucketlistitem:
+        return jsonify({'message': 'bucket list item not found'}), 400
     name = request.json.get('name', bucketlistitem.name)
     if not name.strip():
-        return jsonify({'message': 'please enter a valid name'})
+        return jsonify({'message': 'please enter a valid name'}), 400
     bucketlistitem.name = name
     bucketlistitem.done = done
 
@@ -351,8 +304,8 @@ def update_bucket_list_item(bucketlist_id, item_id):
 
     except Exception:
         db.session.rollback()
-        return jsonify({'message': 'error updating bucket list item'}), status.HTTP_500_INTERNAL_SERVER_ERROR
-    return jsonify({'message': 'successfully updated bucket list item'})
+        return jsonify({'message': 'error updating bucket list item'}), 400
+    return jsonify(bucketlistitem.get())
 
 
 @app.route('/bucketlists/<int:bucketlist_id>/items/<int:item_id>', methods=['DELETE'])
@@ -360,12 +313,12 @@ def update_bucket_list_item(bucketlist_id, item_id):
 def delete_bucket_list_item(bucketlist_id, item_id):
     user_id = current_user['user_id']
 
-    if db.session.query(BucketList).filter_by(
-            bucketlist_id=bucketlist_id, created_by=user_id).first() is None:
-        return jsonify({'message': 'bucketlist not found'})
+    if not db.session.query(BucketList).filter_by(
+            bucketlist_id=bucketlist_id, created_by=user_id).first():
+        return jsonify({'message': 'bucketlist not found'}), 400
 
-    if db.session.query(BucketListItems).filter_by(item_id=item_id).count() == 0:
-        return jsonify({'message': 'bucketlist item does not exist'})
+    if not db.session.query(BucketListItems).filter_by(item_id=item_id):
+        return jsonify({'message': 'bucketlist item does not exist'}), 400
 
     db.session.query(BucketListItems).filter_by(
         item_id=item_id).delete()
@@ -373,8 +326,8 @@ def delete_bucket_list_item(bucketlist_id, item_id):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({'message': 'error deleting bucketlist item'}), status.HTTP_500_INTERNAL_SERVER_ERROR
-    return jsonify({'message': 'successfully deleted bucketlist item'})
+        return jsonify({'message': 'error deleting bucketlist item'}), 400
+    return jsonify({}), 204
 
 
 if __name__ == '__main__':
